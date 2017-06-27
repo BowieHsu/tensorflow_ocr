@@ -18,6 +18,8 @@ import numpy as np
 from tf_utils import weight_variable, bias_variable, dense_to_one_hot
 import os
 
+from tensorflow.contrib import slim
+
 # %% Load data
 mnist_cluttered = np.load('./data/mnist_sequence1_sample_5distortions5x5.npz')
 
@@ -31,12 +33,12 @@ y_test = mnist_cluttered['y_test']
 # % turn from dense to one hot representation
 Y_train = dense_to_one_hot(y_train, n_classes=10)
 Y_valid = dense_to_one_hot(y_valid, n_classes=10)
-Y_test = dense_to_one_hot(y_test, n_classes=11)
+Y_test = dense_to_one_hot(y_test, n_classes=10)
 
 
 # %% Placeholders for 40x40 resolution
 # x = tf.placeholder(tf.float32, [None, 1600])
-x = tf.placeholder(tf.float32, [None, 8192])
+x = tf.placeholder(tf.float32, [None, 32, 256, 1])
 y = tf.placeholder(tf.float32, [None, 10])
 
 # %% Since x is currently [batch, height*width], we need to reshape to a
@@ -65,8 +67,12 @@ with tf.name_scope('SPATIAL_TRANS'):
     initial = initial.flatten()
     b_fc_loc2 = tf.Variable(initial_value=initial, name='b_fc_loc2')
 
+    x_shape = x.get_shape().as_list()
+    # print (x_shape)
+    x_reshape = tf.reshape(x, [-1, 8192])
+
     # %% Define the two layer localisation network
-    h_fc_loc1 = tf.nn.tanh(tf.matmul(x, W_fc_loc1) + b_fc_loc1)
+    h_fc_loc1 = tf.nn.tanh(tf.matmul(x_reshape, W_fc_loc1) + b_fc_loc1)
     # %% We can add dropout for regularizing and to reduce overfitting like so:
     keep_prob = tf.placeholder(tf.float32)
     h_fc_loc1_drop = tf.nn.dropout(h_fc_loc1, keep_prob)
@@ -158,109 +164,78 @@ with tf.name_scope('accuracy'):
 
     tf.summary.scalar('accuracy', accuracy)
 
-# %% We now create a new session to actually perform the initialization the
-# variables:
-# sess = tf.Session()
-
-
-    # with tf.name_scope('load_image'):
-    # #读取图片
-    #     file1 = tf.read_file('./ocr_data/1/3453.jpg')
-    #     image = tf.image.decode_jpeg(file1, channels=1)
-    #     image = tf.reshape(image, [1, 8192])
-    #     writer= tf.summary.FileWriter("log", sess.graph)
-
-    # with tf.name_scope('load_image_2'):
-    # #读取图片
-    #     file1 = tf.read_file('./ocr_data/2/2862.jpg')
-    #     image_2 = tf.image.decode_jpeg(file1, channels=1)
-    #     image_2 = tf.reshape(image_2, [1, 8192])
-    #     writer= tf.summary.FileWriter("log", sess.graph)
-
-    # with tf.name_scope('load_image_valid'):
-    #     #读取图片
-    #     file2 = tf.read_file('./ocr_data/2/2861.jpg')
-    #     image_valid = tf.image.decode_jpeg(file1, channels=1)
-    #     image_valid = tf.reshape(image_valid, [1, 8192])
-    #     writer= tf.summary.FileWriter("log", sess.graph)
-
-    def get_filenames(path):
-        filenames = []
-        for root, dirs, files in os.walk(path):
+def get_filenames(path):
+    filenames = []
+    for root, dirs, files in os.walk(path):
             for f in files:
                 if ".jpg" in f:
                     filenames.append(os.path.join(root, f))
-        return filenames
+    return filenames
 
-    def read_img(filenames, num_epochs, shuffle=True):
-        filename_queue = tf.train.string_input_producer(filenames, num_epochs=num_epochs, shuffle=True)
-        print(filename_queue)
-        reader = tf.WholeFileReader()
-        key, value = reader.read(filename_queue)
-        print('value', value)
-        img = tf.image.decode_jpeg(value, channels=1)
-        img = tf.reshape(img, [1, 8192])
-        # img = tf.image.resize_images(img, size=(256, 256), method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
-        return img
+def read_img(filenames, num_epochs, shuffle=True):
+    filename_queue = tf.train.string_input_producer(filenames, num_epochs=num_epochs, shuffle=True)
+    reader = tf.WholeFileReader()
+    key, value = reader.read(filename_queue)
+    img = tf.image.decode_jpeg(value, channels=1)
+    img = tf.image.resize_images(img, size = (32, 256), method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+    # img = tf.reshape(img, [32, 256, 1])
+    # img = tf.image.resize_images(img, size=(256, 256), method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+    return img
 
     # %% We'll now train in minibatches and report accuracy, loss:
-    iter_per_epoch = 10
-    n_epochs = 500
-    train_size = 10000
+iter_per_epoch = 10
+n_epochs = 500
+train_size = 10000
 
-    # 将所有显示结果进行汇总
-    merge = tf.summary.merge_all()
+# 将所有显示结果进行汇总
+merge = tf.summary.merge_all()
 
-    #batch_xs = sess.run(image)
-    image_list_1 = get_filenames('./ocr_data/1')
-    print (image_list_1)
+#batch_xs = sess.run(image)
+image_list_1 = get_filenames('./ocr_data/1')
 
-    img = read_img(image_list_1, 1, True)
+img = read_img(image_list_1, 100, True)
 
-    print(img)
+EPOCH = 10
+min_after_dequeue = 1000
+capacity = min_after_dequeue + 3 * 4
 
-    EPOCH = 10
-    min_after_dequeue = 1000
-    capacity = min_after_dequeue + 3 * 4
+print('img', img)
 
-    img_batch = tf.train.batch([img], batch_size=EPOCH, num_threads=2,
-                                  capacity=capacity)
-    batch_ys = []
-    for i in range(EPOCH):
-        batch_ys.append(Y_train[i])
+img_batch = tf.train.batch([img], batch_size=EPOCH, num_threads=2,
+                                capacity=capacity)
 
-    # X_valid = sess.run(image_valid)
+print('img_batch', img_batch)
 
-    with tf.Session() as sess:
-        init = (tf.global_variables_initializer(), tf.local_variables_initializer())
-        sess.run(init)
 
-        coord = tf.train.Coordinator()
-        threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+# X_valid = sess.run(image_valid)
 
-        for epoch_i in range(n_epochs):
-        # try:
-            batch_xs = sess.run([img_batch])
-            loss,summaries = sess.run([cross_entropy, merge],
-                            feed_dict={
-                                x: batch_xs,
-                                y: batch_ys,
-                                keep_prob: 1.0
-                            })
-            print('Iteration: ' + str(epoch_i) + ' Loss: ' + str(loss))
+with tf.Session() as sess:
 
+    writer= tf.summary.FileWriter("log", sess.graph)
+    init = (tf.global_variables_initializer(), tf.local_variables_initializer())
+    sess.run(init)
+
+    coord = tf.train.Coordinator()
+    threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+
+    # for epoch_i in range(n_epochs):
+    # try:
+
+    for epoch_i in range(5000):
+        # print('batch_xs', img_batch)
+        batch_xs = sess.run([img_batch])
+
+        batch_ys = []
+        for i in range(EPOCH):
+            batch_ys.append(Y_train[epoch_i * EPOCH % 10000 + i])
+
+        for img in batch_xs:
+            # print (img.shape)
+            if(epoch_i % 10 == 0):
+                loss,summaries = sess.run([cross_entropy, merge], feed_dict={ x: img, y: batch_ys, keep_prob: 1.0 })
+                print(str(epoch_i),str(loss))
             writer.add_summary(summaries, epoch_i)
-            sess.run(optimizer, feed_dict={
-                x: batch_xs, y: batch_ys, keep_prob: 0.8})
+            sess.run(optimizer, feed_dict={ x: img, y: batch_ys, keep_prob: 0.8})
 
-            # print('Accuracy (%d): ' % epoch_i + str(sess.run(accuracy,
-            #         feed_dict={ x: X_valid, y: Y_valid, keep_prob: 1.0 })))
-
-        # except Exception, e:
-        #     coord.request_stop(e)
-        # finally:
-        coord.request_stop()
-        coord.join(threads)
-    # theta = sess.run(h_fc_loc2, feed_dict={
-    #        x: batch_xs, keep_prob: 1.0})
-    # print(theta[0])
+    coord.request_stop()
+    coord.join(threads)
