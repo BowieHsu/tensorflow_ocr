@@ -1,476 +1,0 @@
-name:"alabo_chepai_attention_simple" 
-layer { 
-  name: "data" 
-  type: "ImageData" 
-  top: "data" 
-  top: "recog_label1" 
-  include { phase: TRAIN } 
-  transform_param { 
-    #scale: 0.00390625 
-	scale: 0.0078125 
-	mean_value: 128 
-  } 
-	image_data_param{ 
-	   source: "demo/att_alabo/datalist/train_6620_raw_39.txt" 
-	   root_folder: "demo/att_alabo/dataset/" 
-	   num_labels:10 
-	   batch_size:64
-	   shuffle: true 
-	} 
-} 
- 
- 
-layer { 
-  name: "data" 
-  type: "ImageData" 
-  top: "data" 
-  top: "recog_label1" 
-  include { phase: TEST } 
-  transform_param { 
-    #scale: 0.00390625 
-	scale: 0.0078125 
-	mean_value: 128 
-  } 
-  image_data_param{ 
-    source: "demo/att_alabo/datalist/test_735_raw_39.txt" 
-    root_folder: "demo/att_alabo/dataset/" 
-    num_labels: 10 
-    batch_size: 64  
-  } 
-} 
- 
-layer { 
-  name: "permutelabel" 
-  type: "Permute" 
-  bottom: "recog_label1" 
-  top: "recog_label" 
-  permute_param { 
-  order: 1 
-  order: 0 
-  } 
-} 
- 
-###################################################################################### 
-#out shape: 64 x 64 x 60 x 180 
-layer { 
-  name: "conv1" 
-  type: "Convolution" 
-  bottom: "data" 
-  top: "conv1" 
-  param { 
-    lr_mult: 1 
-  } 
-  param { 
-    lr_mult: 2 
-  } 
-  convolution_param { 
-    num_output: 64 
-    kernel_size: 3 
-    stride: 1 
-	pad: 1 
-    weight_filler { 
-      type: "xavier" 
-    } 
-    bias_filler { 
-      type: "constant" 
-    } 
-  } 
-} 
- 
- layer {   
-  name: "relu1" 
-  type: "ReLU" 
-  bottom: "conv1"   
-  top: "relu1"   
-}   
- 
-#out shape: 64 x 64 x 30 x 90 
-layer { 
-  name: "pool1" 
-  type: "Pooling" 
-  bottom: "relu1" 
-  top: "pool1" 
-  pooling_param { 
-    pool: MAX 
-    kernel_size: 2 # pool over a 2x2 region 
-    stride: 2      # step two pixels (in the bottom blob) between pooling regions 
-  } 
-} 
-###################################################################################### 
-#out shape: 64 x 128 x 30 x 90 
-layer { 
-  name: "conv2" 
-  type: "Convolution" 
-  bottom: "pool1" 
-  top: "conv2" 
-  param { 
-    lr_mult: 1 
-  } 
-  param { 
-    lr_mult: 2 
-  } 
-  convolution_param { 
-    num_output: 128 
-    kernel_size: 3 
-    stride: 1 
-	pad: 1 
-    weight_filler { 
-      type: "xavier" 
-    } 
-    bias_filler { 
-      type: "constant" 
-    } 
-  } 
-} 
- 
- layer {   
-  name: "relu2"   
-  type: "ReLU"   
-  bottom: "conv2"   
-  top: "relu2"   
-} 
- 
-#out shape: 64 x 128 x 16 x 46 
-layer { 
-  name: "pool2" 
-  type: "Pooling" 
-  bottom: "relu2" 
-  top: "pool2" 
-  pooling_param { 
-    pool: MAX 
-    kernel_size: 2 # pool over a 2x2 region 
-    stride: 2      # step two pixels (in the bottom blob) between pooling regions 
-	pad: 1 
-  } 
-} 
-###################################################################################### 
-#out shape: 64 x 256 x 16 x 46 
-layer { 
-  name: "conv3" 
-  type: "Convolution" 
-  bottom: "pool2" 
-  top: "conv3" 
-  param { 
-    lr_mult: 1 
-  } 
-  param { 
-    lr_mult: 2 
-  } 
-  convolution_param { 
-    num_output: 256 
-    kernel_size: 3 
-    stride: 1 
-	pad: 1 
-    weight_filler { 
-      type: "xavier" 
-    } 
-    bias_filler { 
-      type: "constant" 
-    } 
-  } 
-} 
- 
-layer {include { phase: TRAIN }  name: "conv3_bn"  type: "BatchNorm"  bottom: "conv3"  top: "conv3_bn"  batch_norm_param {    use_global_stats: false    moving_average_fraction: 0.9    eps: 1e-4  }}layer {include { phase: TEST }  name: "conv3_bn"  type: "BatchNorm"  bottom: "conv3"  top: "conv3_bn"  batch_norm_param {    use_global_stats: true    moving_average_fraction: 0.9    eps: 1e-4  }}
- 
- layer {   
-  name: "relu3"   
-  type: "ReLU"   
-  bottom: "conv3_bn"   
-  top: "relu3" 
-} 
-###################################################################################### 
-#out shape: 64 x 256 x 16 x 46 
-layer { 
-  name: "conv4" 
-  type: "Convolution" 
-  bottom: "relu3" 
-  top: "conv4" 
-  param { 
-    lr_mult: 1 
-  } 
-  param { 
-    lr_mult: 2 
-  } 
-  convolution_param { 
-    num_output: 256 
-    kernel_size: 3 
-    stride: 1 
-	pad: 1 
-    weight_filler { 
-      type: "xavier" 
-    } 
-    bias_filler { 
-      type: "constant" 
-    } 
-  } 
-} 
- 
- layer { 
-  name: "relu4"   
-  type: "ReLU"   
-  bottom: "conv4"   
-  top: "relu4" 
-} 
- 
-#out shape: 64 x 256 x 8 x 24 
-layer { 
-  name: "pool3" 
-  type: "Pooling" 
-  bottom: "relu4" 
-  top: "pool3" 
-  pooling_param { 
-    pool: MAX 
-    kernel_size: 2 # pool over a 2x2 region 
-	stride: 2 
-	pad_w: 1 
-	pad_h: 0 
-  } 
-} 
-###################################################################################### 
-#out shape: 64 x 512 x 8 x 24 
-layer { 
-  name: "conv5" 
-  type: "Convolution" 
-  bottom: "pool3" 
-  top: "conv5" 
-  param { 
-    lr_mult: 1 
-  } 
-  param { 
-    lr_mult: 2 
-  } 
-  convolution_param { 
-    num_output: 512 
-    kernel_size: 3 
-    stride: 1 
-	pad: 1 
-    weight_filler { 
-      type: "xavier" 
-    } 
-    bias_filler { 
-      type: "constant" 
-    } 
-  } 
-} 
- 
-layer {include { phase: TRAIN }  name: "conv5_bn"  type: "BatchNorm"  bottom: "conv5"  top: "conv5_bn"  batch_norm_param {    use_global_stats: false    moving_average_fraction: 0.9    eps: 1e-4  }}layer {include { phase: TEST }  name: "conv5_bn"  type: "BatchNorm"  bottom: "conv5"  top: "conv5_bn"  batch_norm_param {    use_global_stats: true    moving_average_fraction: 0.9    eps: 1e-4  }}
- 
- layer { 
-  name: "relu5"   
-  type: "ReLU"   
-  bottom: "conv5_bn"   
-  top: "relu5" 
-} 
-###################################################################################### 
-#out shape: 64 x 512 x 8 x 24 
-layer { 
-  name: "conv6" 
-  type: "Convolution" 
-  bottom: "relu5" 
-  top: "conv6" 
-  param { 
-    lr_mult: 1 
-  } 
-  param { 
-    lr_mult: 2 
-  } 
-  convolution_param { 
-    num_output: 512 
-    kernel_size: 3 
-    stride: 1 
-	pad: 1 
-    weight_filler { 
-      type: "xavier" 
-    } 
-    bias_filler { 
-      type: "constant" 
-    } 
-  } 
-} 
- 
- layer { 
-  name: "relu6"   
-  type: "ReLU"   
-  bottom: "conv6"   
-  top: "relu6" 
-} 
- 
-#out shape: 64 x 512 x 4 x 25 
-layer { 
-  name: "pool4" 
-  type: "Pooling" 
-  bottom: "relu6" 
-  top: "pool4" 
-  pooling_param { 
-    pool: MAX 
-    kernel_size: 2 # pool over a 2x2 region 
-    stride_w: 1 
-	stride_h: 2 
-	pad_w: 1 
-	pad_h: 0 
-  } 
-} 
-###################################################################################### 
-#out shape: 64 x 512 x 1 x 100 
-layer { 
-    name: "flatten" 
-    type: "Reshape" 
-    bottom: "pool4" 
-    top: "flatten" 
-    reshape_param { 
-      shape { 
-        dim: 64   
-        dim: 512 
-		dim: 1 
-		dim: 100 
-      } 
-    } 
-  } 
-   
-###################################################################################### 
-# compute cont 
-layer { 
-  name: "cont" 
-  type: "SeqMask" 
-  bottom: "recog_label" 
-  top: "cont" 
-  att_param { 
-	eos: 38 
-  } 
-} 
- 
-   
-# shift one label 
-layer { 
-  name: "shiftseq1" 
-  type: "ShiftSeq" 
-  bottom: "recog_label" 
-  top: "recog_label_input" 
-  att_param{ 
-    bos: 36 
-  } 
-} 
- 
-###################################################################################### 
- 
-layer { 
-# 100 * 64 * 512 (Length x Batch x Channels) 
-  name: "axis-swap" 
-  type: "AxisSwap" 
-  bottom: "flatten" 
-  top: "concat_pool" 
-  axis_swap_param { 
-    max_width: 100 
-  } 
-} 
- 
-#layer { 
-#  name: "lstm1" 
-#  type: "Curnn" 
-#  bottom: "concat_pool" 
-#  top: "concat_pool" 
-#  curnn_param { 
-#    hidden_states: 256 
-#	num_layers: 1 
-#	bidirectional: 1 
-#	mode: 2 # 0:RNN sigmoid   1:RNN tanh  2:LSTM 3:GRU 
-#	dropout: 0 
-#    weight_filler { 
-#      type: "uniform" 
-#      min: -0.08 
-#      max: 0.08 
-#    } 
-#    bias_filler { 
-#      type: "constant" 
-#      value: 0 
-#    } 
-#  } 
-#} 
- 
-layer { 
-    name: "reshape_x" 
-    type: "Reshape" 
-    bottom: "concat_pool" 
-    top: "concat_pool1" 
-    reshape_param { 
-      shape { 
-        dim: 100  # inputLength 
-        dim: 64  # batch size 
-        dim: 512 
-        #dim: -1 # infer it from the other dimensions 
-      } 
-    } 
-  } 
-   
-# 100 * 2 * 512 
-layer { 
-  name: "RNNDecWT" 
-  type: "RNNDecWT" 
-  bottom: "concat_pool1" 
-  bottom: "cont" 
-  bottom: "recog_label_input" 
-  top: "RNNDec" 
-  recurrent_param { 
-    num_output: 512 
-    weight_filler { 
-      type: "uniform" 
-      min: -0.08 
-      max: 0.08 
-    } 
-    bias_filler { 
-      type: "constant" 
-      value: 0 
-    } 
-  } 
-  att_param { 
-    type: 2 
-	loc_dim: 256 
-	loc_size: 5 
-	bos: 36 
-	embed_input_dim: 39 
-	embed_num_output: 100 
-  } 
-} 
- 
-###################################################################################### 
-layer { 
-  name: "SoftmaxLoss" 
-  type: "AttSoftmaxWithLoss" 
-  bottom: "RNNDec" 
-  bottom: "recog_label" 
-  top: "SoftmaxLoss" 
-  loss_weight: 1 
-  ctc_param { 
-    axis: 2 
-  } 
-  softmax_param { 
-    axis: 2 
-  } 
-} 
- 
-##################################################################################### 
-layer { 
-  name: "softmax" 
-  type: "Softmax" 
-  bottom: "RNNDec" 
-  top: "softmax" 
-  include { phase: TEST } 
-  softmax_param { 
-    axis: 2 
-  } 
-} 
- 
-layer { 
-  name: "accuracy" 
-  type: "AttAccuracy" 
-  bottom: "softmax" 
-  bottom: "recog_label" 
-  top: "accuracy_recog" 
-  include { phase: TEST } 
-  att_param { 
-    str_map: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ$_#" 
-	eos: 38 
-  } 
-} 
- 
- 
