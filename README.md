@@ -1,2 +1,2 @@
 # tensorflow_ocr
-ocr implement with tensorflow v1.1
+OCR Implement with tensorflow v1.4

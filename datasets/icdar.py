@@ -81,6 +81,28 @@ def polygon_area(poly):
     ]
     return np.sum(edge)/2.
 
+def valid_link(point, score_map, direction):
+    if direction == 'up':
+        point_dir = np.array([point[0], point[1] - 1])
+    elif direction == 'down':
+        point_dir = np.array([point[0], point[1] + 1])
+    elif direction == 'left':
+        point_dir = np.array([point[0] - 1, point[1]])
+    elif direction == 'right':
+        point_dir = np.array([point[0] + 1, point[1]] )
+    elif direction == 'left_up':
+        point_dir = np.array([point[0] - 1, point[1] - 1])
+    elif direction == 'left_down':
+        point_dir = np.array([point[0] - 1, point[1] + 1])
+    elif direction == 'right_up':
+        point_dir = np.array([point[0] + 1, point[1] - 1])
+    elif direction == 'right_down':
+        point_dir = np.array([point[0] + 1, point[1] + 1])
+    if score_map[point[1], point[0]] == 1 and score_map[point_dir[1], point_dir[0]] == 1:
+        return 1
+    else:
+        return 0
+
 
 def check_and_validate_polys(polys, tags, xxx_todo_changeme):
     '''
@@ -464,7 +486,7 @@ def generate_rbox(im_size, polys, tags):
     h, w = im_size
     poly_mask = np.zeros((h, w), dtype=np.uint8)
     score_map = np.zeros((h, w), dtype=np.uint8)
-    geo_map = np.zeros((h, w, 5), dtype=np.float32)
+    geo_map = np.zeros((h, w, 8), dtype=np.float32)
     # mask used during traning, to ignore some hard areas
     training_mask = np.ones((h, w), dtype=np.uint8)
     for poly_idx, poly_tag in enumerate(zip(polys, tags)):
@@ -566,17 +588,25 @@ def generate_rbox(im_size, polys, tags):
 
         p0_rect, p1_rect, p2_rect, p3_rect = rectange
         for y, x in xy_in_poly:
-            point = np.array([x, y], dtype=np.float32)
-            # top
-            geo_map[y, x, 0] = point_dist_to_line(p0_rect, p1_rect, point)
-            # right
-            geo_map[y, x, 1] = point_dist_to_line(p1_rect, p2_rect, point)
-            # down
-            geo_map[y, x, 2] = point_dist_to_line(p2_rect, p3_rect, point)
+            point = np.array([x, y], dtype=np.int32)
             # left
-            geo_map[y, x, 3] = point_dist_to_line(p3_rect, p0_rect, point)
-            # angle
-            geo_map[y, x, 4] = rotate_angle
+
+            geo_map[y, x, 0] = valid_link(point, score_map,'left')
+            # left_down
+            geo_map[y, x, 1] = valid_link(point, score_map,'left_down')
+            # left_up
+            geo_map[y, x, 2] = valid_link(point, score_map,'left_up')
+            # right
+            geo_map[y, x, 3] = valid_link(point, score_map,'right')
+            # right_down
+            geo_map[y, x, 4] = valid_link(point, score_map,'right_down')
+            # right_up
+            geo_map[y, x, 5] = valid_link(point, score_map,'right_up')
+            # up
+            geo_map[y, x, 6] = valid_link(point, score_map,'up')
+            # down
+            geo_map[y, x, 7] = valid_link(point, score_map,'down')
+
     return score_map, geo_map, training_mask
 
 
@@ -631,7 +661,7 @@ def generator(input_size=512, batch_size=32,
                     im_padded[:new_h, :new_w, :] = im.copy()
                     im = cv2.resize(im_padded, dsize=(input_size, input_size))
                     score_map = np.zeros((input_size, input_size), dtype=np.uint8)
-                    geo_map_channels = 5 if FLAGS.geometry == 'RBOX' else 8
+                    geo_map_channels = 8 if FLAGS.geometry == 'RBOX' else 8
                     geo_map = np.zeros((input_size, input_size, geo_map_channels), dtype=np.float32)
                     training_mask = np.ones((input_size, input_size), dtype=np.uint8)
                 else:
@@ -657,6 +687,8 @@ def generator(input_size=512, batch_size=32,
                     text_polys[:, :, 1] *= resize_ratio_3_y
                     new_h, new_w, _ = im.shape
                     score_map, geo_map, training_mask = generate_rbox((new_h, new_w), text_polys, text_tags)
+                    cv2.imwrite('./geo_map.jpg', geo_map[:,:,0]*255)
+                    cv2.imwrite('./score_map.jpg', score_map*255)
 
                 if vis:
                     fig, axs = plt.subplots(3, 2, figsize=(20, 30))

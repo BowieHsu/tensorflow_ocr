@@ -19,17 +19,17 @@ tf.app.flags.DEFINE_string('pretrained_model_path', None, '')
 from nets import model
 from datasets import icdar
 import pdb
+import tensorflow.contrib.eager as tfe
 
 FLAGS = tf.app.flags.FLAGS
 
 gpus = list(range(len(FLAGS.gpu_list.split(','))))
 
-
 def tower_loss(images, score_maps, geo_maps, training_masks, reuse_variables=None):
     # Build inference graph
     with tf.variable_scope(tf.get_variable_scope(), reuse=reuse_variables):
-        # f_score, f_geometry = model.model(images, is_training=True)
-        f_score, f_geometry = model.model_resnet_v1_101(images, is_training=True)
+        f_score, f_geometry = model.model(images, is_training=True)
+        # f_score, f_geometry = model.model_resnet_v1_101(images, is_training=True)
 
     model_loss = model.loss(score_maps, f_score,
                             geo_maps, f_geometry,
@@ -81,7 +81,7 @@ def main(argv=None):
     input_images = tf.placeholder(tf.float32, shape=[None, None, None, 3], name='input_images')
     input_score_maps = tf.placeholder(tf.float32, shape=[None, None, None, 1], name='input_score_maps')
     if FLAGS.geometry == 'RBOX':
-        input_geo_maps = tf.placeholder(tf.float32, shape=[None, None, None, 5], name='input_geo_maps')
+        input_geo_maps = tf.placeholder(tf.float32, shape=[None, None, None, 8], name='input_geo_maps')
     else:
         input_geo_maps = tf.placeholder(tf.float32, shape=[None, None, None, 8], name='input_geo_maps')
     input_training_masks = tf.placeholder(tf.float32, shape=[None, None, None, 1], name='input_training_masks')
