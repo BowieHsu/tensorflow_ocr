@@ -104,6 +104,7 @@ def model(images, weight_decay=1e-5, is_training=True):
                             weights_regularizer=slim.l2_regularizer(weight_decay)):
             feature_maps = [end_points['pool5'], end_points['pool4'],
                  end_points['pool3'], end_points['pool2']]
+
             for i in range(4):
                 print('Shape of f_{} {}'.format(i, feature_maps[i].shape))
             g = [None, None, None, None]
@@ -126,7 +127,7 @@ def model(images, weight_decay=1e-5, is_training=True):
             # this is do with the angle map
             F_score = slim.conv2d(g[3], 1, 1, activation_fn=tf.nn.sigmoid, normalizer_fn=None)
             # 4 channel of axis aligned bbox and 1 channel rotation angle
-            geo_map = slim.conv2d(g[3], 8, 1, activation_fn=tf.nn.sigmoid, normalizer_fn=None)
+            geo_map = slim.conv2d(g[3], 16, 1, activation_fn=tf.nn.sigmoid, normalizer_fn=None)
             # angle_map = (slim.conv2d(g[3], 1, 1, activation_fn=tf.nn.sigmoid, normalizer_fn=None) - 0.5) * np.pi/2 # angle is between [-45, 45]
             # F_geometry = tf.concat([geo_map, angle_map], axis=-1)
 

@@ -19,7 +19,6 @@ tf.app.flags.DEFINE_string('pretrained_model_path', None, '')
 from nets import model
 from datasets import icdar
 import pdb
-import tensorflow.contrib.eager as tfe
 
 FLAGS = tf.app.flags.FLAGS
 

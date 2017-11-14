@@ -687,8 +687,8 @@ def generator(input_size=512, batch_size=32,
                     text_polys[:, :, 1] *= resize_ratio_3_y
                     new_h, new_w, _ = im.shape
                     score_map, geo_map, training_mask = generate_rbox((new_h, new_w), text_polys, text_tags)
-                    cv2.imwrite('./geo_map.jpg', geo_map[:,:,0]*255)
-                    cv2.imwrite('./score_map.jpg', score_map*255)
+                    # cv2.imwrite('./geo_map.jpg', geo_map[:,:,0]*255)
+                    # cv2.imwrite('./score_map.jpg', score_map*255)
 
                 if vis:
                     fig, axs = plt.subplots(3, 2, figsize=(20, 30))
@@ -769,8 +769,6 @@ def get_batch(num_workers, **kwargs):
     finally:
         if enqueuer is not None:
             enqueuer.stop()
-
-
 
 if __name__ == '__main__':
     pass
