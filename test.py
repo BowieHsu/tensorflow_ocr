@@ -19,7 +19,7 @@ FLAGS = tf.app.flags.FLAGS
 
 gpus = list(range(len(FLAGS.gpu_list.split(','))))
 
-def pixel_detect(score_map, geo_map, score_map_thresh=0.8, link_thresh=0.999):
+def pixel_detect(score_map, geo_map, score_map_thresh=0.8, link_thresh=0.8):
     '''
     restore text boxes from score map and geo map
     :param score_map:
@@ -45,16 +45,16 @@ def pixel_detect(score_map, geo_map, score_map_thresh=0.8, link_thresh=0.999):
     res = res_map
 
     for i in range(8):
-        geo_map_split = geo_map[:,:,i]
+        geo_map_split = geo_map[:,:,i * 2 - 1]
         link_text = np.argwhere(geo_map_split > link_thresh)
-        pdb.set_trace()
-        for p in link_text:
-            res[p[0],p[1]] = 1
+        # pdb.set_trace()
+        # for p in link_text:
+            # res[p[0],p[1]] = 1
 
     xy_text = np.argwhere(res == 1)
 
     for p in xy_text:
-        ori_res_map[p[0] * 4 - 1: p[0] * 4 + 1, p[1] * 4 - 1 : p[1] * 4 + 1] = 1
+        ori_res_map[p[0] * 4 - 2: p[0] * 4 + 2, p[1] * 4 - 2 : p[1] * 4 + 2] = 1
 
     ori_res_map = np.array(ori_res_map, dtype=np.uint8)
    
@@ -149,11 +149,20 @@ def main(argv=None):
 
                 score_map_res = pixel_detect(score_map=score, geo_map=geometry)
 
-                pdb.set_trace()
+                # pdb.set_trace()
 
                 im2, contours , hierarchy = cv2.findContours(score_map_res,cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+                # pdb.set_trace()
 
-                cv2.drawContours(im_resized, contours, -1, (0,0,255), 3)
+                for i in range(len(contours)):
+                    np_contours = np.array(np.reshape(contours[i],[-1,2]), dtype=np.float32)
+
+                    rectangle = cv2.minAreaRect(np_contours)
+
+                    box = np.int0(cv2.boxPoints(rectangle))
+                    cv2.drawContours(im_resized, [box], -1,(0,0,255), 3)
+
+                # cv2.polylines(im_resized, points, -1, (0,0,255), 3)
 
                 img_path = os.path.join(FLAGS.output_dir, os.path.basename(im_fn))
 

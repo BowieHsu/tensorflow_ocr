@@ -127,7 +127,8 @@ def model(images, weight_decay=1e-5, is_training=True):
             # this is do with the angle map
             F_score = slim.conv2d(g[3], 1, 1, activation_fn=tf.nn.sigmoid, normalizer_fn=None)
             # 4 channel of axis aligned bbox and 1 channel rotation angle
-            geo_map = slim.conv2d(g[3], 16, 1, activation_fn=tf.nn.sigmoid, normalizer_fn=None)
+            # geo_map = slim.conv2d(g[3], 16, 1, activation_fn=tf.nn.sigmoid, normalizer_fn=None)
+            geo_map = slim.conv2d(g[3], 16, 1, activation_fn=None, normalizer_fn=None)
             # angle_map = (slim.conv2d(g[3], 1, 1, activation_fn=tf.nn.sigmoid, normalizer_fn=None) - 0.5) * np.pi/2 # angle is between [-45, 45]
             # F_geometry = tf.concat([geo_map, angle_map], axis=-1)
 
@@ -166,71 +167,42 @@ def loss(y_true_pixel, y_pred_pixel,
     # d1 -> top, d2->right, d3->bottom, d4->left
     d1_gt, d2_gt, d3_gt, d4_gt, d5_gt, d6_gt, d7_gt, d8_gt= tf.split(value=y_true_link, num_or_size_splits=8, axis=3)
     d1_pred, d2_pred, d3_pred, d4_pred, d5_pred, d6_pred, d7_pred, d8_pred= tf.split(value=y_pred_link, num_or_size_splits=8, axis=3)
-
-    d1_pos_n = tf.reduce_mean(tf.cast(tf.equal(d1_gt, 1),tf.float32))
-    d2_pos_n = tf.reduce_mean(tf.cast(tf.equal(d2_gt, 1),tf.float32))
-    d3_pos_n = tf.reduce_mean(tf.cast(tf.equal(d3_gt, 1),tf.float32))
-    d4_pos_n = tf.reduce_mean(tf.cast(tf.equal(d4_gt, 1),tf.float32))
-    d5_pos_n = tf.reduce_mean(tf.cast(tf.equal(d5_gt, 1),tf.float32))
-    d6_pos_n = tf.reduce_mean(tf.cast(tf.equal(d6_gt, 1),tf.float32))
-    d7_pos_n = tf.reduce_mean(tf.cast(tf.equal(d7_gt, 1),tf.float32))
-    d8_pos_n = tf.reduce_mean(tf.cast(tf.equal(d8_gt, 1),tf.float32))
-
-    d1_link_loss = - tf.reduce_mean(d1_gt * tf.log(d1_pred + 1e-10))/d1_pos_n
-    d2_link_loss = - tf.reduce_mean(d1_gt * tf.log(d2_pred + 1e-10))/d2_pos_n
-    d3_link_loss = - tf.reduce_mean(d1_gt * tf.log(d3_pred + 1e-10))/d3_pos_n
-    d4_link_loss = - tf.reduce_mean(d1_gt * tf.log(d4_pred + 1e-10))/d4_pos_n
-    d5_link_loss = - tf.reduce_mean(d1_gt * tf.log(d5_pred + 1e-10))/d5_pos_n
-    d6_link_loss = - tf.reduce_mean(d1_gt * tf.log(d6_pred + 1e-10))/d6_pos_n
-    d7_link_loss = - tf.reduce_mean(d1_gt * tf.log(d7_pred + 1e-10))/d7_pos_n
-    d8_link_loss = - tf.reduce_mean(d1_gt * tf.log(d8_pred + 1e-10))/d8_pos_n
-
-    link_loss = d1_link_loss + d2_link_loss + d3_link_loss + d4_link_loss + d5_link_loss + d6_link_loss + d7_link_loss + d8_link_loss
-
-    # d1_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
-                         # logits = d1_pred,
-                         # labels = tf.cast(d1_gt, dtype = tf.int32)))
-
-    # d2_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
-                         # logits = d2_pred,
-                         # labels = tf.cast(tf.squeeze(d2_gt), dtype = tf.int32)))/d2_pos_n
     
-    # d3_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
-                         # logits = d3_pred,
-                         # labels = tf.cast(tf.squeeze(d3_gt), dtype = tf.int32)))/d3_pos_n
+    #single example
+    # d1_gt_reshape = tf.cast(tf.reshape(d1_gt, [-1]), tf.int32)
+    # d1_pred_reshape = tf.reshape(d1_pred, [-1, 2])
 
-    # d4_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
-                         # logits = d4_pred,
-                         # labels = tf.cast(tf.squeeze(d4_gt), dtype = tf.int32)))/d4_pos_n
+    # d1_pos_n = tf.reduce_sum(tf.cast(tf.equal(d1_gt_reshape, 1),tf.float32))
+    # d2_pos_n = tf.reduce_sum(tf.cast(tf.equal(d2_gt, 1),tf.float32))
+    # d3_pos_n = tf.reduce_sum(tf.cast(tf.equal(d3_gt, 1),tf.float32))
+    # d4_pos_n = tf.reduce_sum(tf.cast(tf.equal(d4_gt, 1),tf.float32))
+    # d5_pos_n = tf.reduce_sum(tf.cast(tf.equal(d5_gt, 1),tf.float32))
+    # d6_pos_n = tf.reduce_sum(tf.cast(tf.equal(d6_gt, 1),tf.float32))
+    # d7_pos_n = tf.reduce_sum(tf.cast(tf.equal(d7_gt, 1),tf.float32))
+    # d8_pos_n = tf.reduce_sum(tf.cast(tf.equal(d8_gt, 1),tf.float32))
 
-    # d5_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
-                         # logits = d5_pred,
-                         # labels = tf.cast(tf.squeeze(d5_gt), dtype = tf.int32)))/d5_pos_n
+    # d1_softmax_loss = tf.reduce_sum((tf.nn.sparse_softmax_cross_entropy_with_logits(labels = d1_gt_reshape, logits = d1_pred_reshape)) * tf.cast(d1_gt_reshape, tf.float32))/d1_pos_n
 
-    # d6_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
-                         # logits = d6_pred,
-                         # labels = tf.cast(tf.squeeze(d6_gt), dtype = tf.int32)))/d6_pos_n
+    # link_loss = d1_softmax_loss
 
-    # d7_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
-                         # logits = d7_pred,
-                         # labels = tf.cast(tf.squeeze(d7_gt), dtype = tf.int32)))/d7_pos_n
+    gt_reshape = tf.cast(tf.reshape(y_true_link, [-1]), tf.int32)
+    pred_reshape = tf.reshape(y_pred_link, [-1, 2])
 
-    # d8_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
-                         # logits = d8_pred,
-                         # labels = tf.cast(tf.squeeze(d8_gt), dtype = tf.int32)))/d8_pos_n
+    pos_n = tf.reduce_sum(tf.cast(tf.equal(gt_reshape, 1),tf.float32))
 
-    # link_loss = d1_loss + d2_loss + d3_loss + d4_loss + d5_loss + d6_loss + d7_loss + d8_loss
-    # area_gt = (d1_gt + d3_gt) * (d2_gt + d4_gt)
-    # area_pred = (d1_pred + d3_pred) * (d2_pred + d4_pred)
-    # w_union = tf.minimum(d2_gt, d2_pred) + tf.minimum(d4_gt, d4_pred)
-    # h_union = tf.minimum(d1_gt, d1_pred) + tf.minimum(d3_gt, d3_pred)
-    # area_intersect = w_union * h_union
-    # area_union = area_gt + area_pred - area_intersect
-    # L_AABB = -tf.log((area_intersect + 1.0)/(area_union + 1.0))
-    # L_theta = 1 - tf.cos(theta_pred - theta_gt)
-    # tf.summary.scalar('geometry_AABB', tf.reduce_mean(L_AABB * y_true_cls * training_mask))
-    # tf.summary.scalar('geometry_theta', tf.reduce_mean(L_theta * y_true_cls * training_mask))
-    # L_g = L_AABB + 20 * L_theta
+    softmax_loss = tf.reduce_sum((tf.nn.sparse_softmax_cross_entropy_with_logits(labels = gt_reshape, logits = pred_reshape)) * tf.cast(gt_reshape, tf.float32))/pos_n
 
+    link_loss = softmax_loss
+    # d1_link_loss = - tf.reduce_mean(d1_gt * tf.log(d1_pred + 1e-10))/d1_pos_n
+    # d2_link_loss = - tf.reduce_mean(d1_gt * tf.log(d2_pred + 1e-10))/d2_pos_n
+    # d3_link_loss = - tf.reduce_mean(d1_gt * tf.log(d3_pred + 1e-10))/d3_pos_n
+    # d4_link_loss = - tf.reduce_mean(d1_gt * tf.log(d4_pred + 1e-10))/d4_pos_n
+    # d5_link_loss = - tf.reduce_mean(d1_gt * tf.log(d5_pred + 1e-10))/d5_pos_n
+    # d6_link_loss = - tf.reduce_mean(d1_gt * tf.log(d6_pred + 1e-10))/d6_pos_n
+    # d7_link_loss = - tf.reduce_mean(d1_gt * tf.log(d7_pred + 1e-10))/d7_pos_n
+    # d8_link_loss = - tf.reduce_mean(d1_gt * tf.log(d8_pred + 1e-10))/d8_pos_n
+
+    # link_loss = d1_link_loss + d2_link_loss + d3_link_loss + d4_link_loss + d5_link_loss + d6_link_loss + d7_link_loss + d8_link_loss
+
+    # return link_loss
     return link_loss + classification_loss
-    # return link_loss + pixel_loss 
