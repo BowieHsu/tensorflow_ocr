@@ -11,7 +11,7 @@ tf.app.flags.DEFINE_integer('max_steps', 100000, '')
 tf.app.flags.DEFINE_float('moving_average_decay', 0.997, '')
 tf.app.flags.DEFINE_string('gpu_list', '1', '')
 tf.app.flags.DEFINE_string('checkpoint_path', '/tmp/east_resnet_v1_50_rbox/', '')
-tf.app.flags.DEFINE_boolean('restore', True, 'whether to resotre from checkpoint')
+tf.app.flags.DEFINE_boolean('restore', False, 'whether to resotre from checkpoint')
 tf.app.flags.DEFINE_integer('save_checkpoint_steps', 1000, '')
 tf.app.flags.DEFINE_integer('save_summary_steps', 20, '')
 tf.app.flags.DEFINE_string('pretrained_model_path', None, '')
@@ -36,14 +36,16 @@ def tower_loss(images, score_maps, geo_maps, training_masks, reuse_variables=Non
 
     total_loss = tf.add_n([model_loss] + tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
 
+    geo_score = tf.nn.softmax(f_geometry[:,:,:,0:2])
+
     # add summary
     if reuse_variables is None:
         tf.summary.image('input', images)
         tf.summary.image('score_map', score_maps)
         tf.summary.image('score_map_pred', f_score * 255)
         tf.summary.image('geo_map_0', geo_maps[:, :, :, 0:1])
-        tf.summary.image('geo_map_0_pred', f_geometry[:, :, :, 0:1] * 255)
-        tf.summary.image('geo_map_1_pred', f_geometry[:, :, :, 1:2] * 255)
+        tf.summary.image('geo_map_0_pred', geo_score[:, :, :, 0:1] * 255)
+        tf.summary.image('geo_map_1_pred', geo_score[:, :, :, 1:2] * 255)
         tf.summary.image('training_masks', training_masks)
         tf.summary.scalar('model_loss', model_loss)
         tf.summary.scalar('total_loss', total_loss)
@@ -88,7 +90,7 @@ def main(argv=None):
     input_training_masks = tf.placeholder(tf.float32, shape=[None, None, None, 1], name='input_training_masks')
 
     global_step = tf.get_variable('global_step', [], initializer=tf.constant_initializer(0), trainable=False)
-    learning_rate = tf.train.exponential_decay(FLAGS.learning_rate, global_step, decay_steps=10000, decay_rate=0.94, staircase=True)
+    learning_rate = tf.train.exponential_decay(FLAGS.learning_rate, global_step, decay_steps=5000, decay_rate=0.94, staircase=True)
     # add summary
     tf.summary.scalar('learning_rate', learning_rate)
     opt = tf.train.AdamOptimizer(learning_rate)

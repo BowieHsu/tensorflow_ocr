@@ -15,9 +15,32 @@ import numpy as np
 
 import pdb
 
+from scipy.spatial import distance as dist
+
 FLAGS = tf.app.flags.FLAGS
 
 gpus = list(range(len(FLAGS.gpu_list.split(','))))
+
+def order_points(pts):
+    x_sorted = pts[np.argsort(pts[:,0]),:]
+    left_most = x_sorted[:2,:]
+    right_most = x_sorted[2:,:]
+
+    left_most = left_most[np.argsort(left_most[:,1]), :]
+    (tl, bl) = left_most
+
+    D = dist.cdist(tl[np.newaxis], right_most, 'euclidean')[0]
+    (br, tr) = right_most[np.argsort(D)[::-1],:]
+
+    return np.array([tl, tr, br, bl], dtype='int32')
+
+def sort_poly(p):
+    min_axis = np.argmin(np.sum(p, axis=1))
+    p = p[[min_axis, (min_axis+1)%4, (min_axis+2)%4, (min_axis+3)%4]]
+    if abs(p[0, 0] - p[1, 0]) > abs(p[0, 1] - p[1, 1]):
+        return p
+    else:
+        return p[[0, 3, 2, 1]]
 
 def pixel_detect(score_map, geo_map, score_map_thresh=0.8, link_thresh=0.8):
     '''
@@ -53,8 +76,10 @@ def pixel_detect(score_map, geo_map, score_map_thresh=0.8, link_thresh=0.8):
 
     xy_text = np.argwhere(res == 1)
 
+    draw_range = 7
+
     for p in xy_text:
-        ori_res_map[p[0] * 4 - 2: p[0] * 4 + 2, p[1] * 4 - 2 : p[1] * 4 + 2] = 1
+        ori_res_map[p[0] * 4 - draw_range: p[0] * 4 + draw_range, p[1] * 4 - draw_range : p[1] * 4 + draw_range] = 1
 
     ori_res_map = np.array(ori_res_map, dtype=np.uint8)
    
@@ -76,7 +101,7 @@ def get_images():
     print('Find {} images'.format(len(files)))
     return files
 
-def resize_image(im, max_side_len=1000):
+def resize_image(im, max_side_len=3000):
     '''
     resize image to a size multiple of 32 which is required by the network
     :param im: the resized image
@@ -150,23 +175,43 @@ def main(argv=None):
                 score_map_res = pixel_detect(score_map=score, geo_map=geometry)
 
                 # pdb.set_trace()
+                
+                boxes = []
 
                 im2, contours , hierarchy = cv2.findContours(score_map_res,cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
                 # pdb.set_trace()
 
+                im_ori = cv2.imread(im_fn)
+                im_ori_resize = cv2.resize(im_ori, (int(im_ori.shape[1] * ratio_w) , int(im_ori.shape[0] * ratio_h)))
+
                 for i in range(len(contours)):
                     np_contours = np.array(np.reshape(contours[i],[-1,2]), dtype=np.float32)
-
                     rectangle = cv2.minAreaRect(np_contours)
-
                     box = np.int0(cv2.boxPoints(rectangle))
-                    cv2.drawContours(im_resized, [box], -1,(0,0,255), 3)
-
-                # cv2.polylines(im_resized, points, -1, (0,0,255), 3)
+                    cv2.drawContours(im_ori_resize, [box], -1,(0,255,0), 3)
+                    
+                    # pdb.set_trace()
+                    box[:, 0] = box[:,0]/ratio_w
+                    box[:, 1] = box[:,1]/ratio_h
+                    boxes.append(box)
 
                 img_path = os.path.join(FLAGS.output_dir, os.path.basename(im_fn))
+                cv2.imwrite(img_path, im_ori_resize)
 
-                cv2.imwrite(img_path, im_resized)
+                # save to file
+                if boxes is not None:
+                    res_file = os.path.join(
+                        FLAGS.output_dir,
+                        'res_{}.txt'.format(
+                            os.path.basename(im_fn).split('.')[0]))
+                    
+                    with open(res_file,'w') as f:
+                        for box in boxes:
+                            # pdb.set_trace()
+                            # box = sort_poly(box.astype(np.int32))
+                            box = order_points(box)
+                            f.write('{},{},{},{},{},{},{},{}\r\n'.format( box[0, 0], box[0, 1], box[1, 0], box[1, 1], box[2, 0], box[2, 1], box[3, 0], box[3, 1]))
+
 
 if __name__ == '__main__':
     tf.app.run()

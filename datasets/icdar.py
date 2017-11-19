@@ -498,7 +498,11 @@ def generate_rbox(im_size, polys, tags):
             r[i] = min(np.linalg.norm(poly[i] - poly[(i + 1) % 4]),
                        np.linalg.norm(poly[i] - poly[(i - 1) % 4]))
         # score map
-        shrinked_poly = shrink_poly(poly.copy(), r).astype(np.int32)[np.newaxis, :, :]
+        # shrinked_poly = shrink_poly(poly.copy(), r).astype(np.int32)[np.newaxis, :, :]
+
+        # close shrink function
+        shrinked_poly = poly.astype(np.int32)[np.newaxis, :,:]
+
         cv2.fillPoly(score_map, shrinked_poly, 1)
         cv2.fillPoly(poly_mask, shrinked_poly, poly_idx + 1)
         # if the poly is too small, then ignore it during training

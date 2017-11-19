@@ -109,7 +109,7 @@ def model(images, weight_decay=1e-5, is_training=True):
                 print('Shape of f_{} {}'.format(i, feature_maps[i].shape))
             g = [None, None, None, None]
             h = [None, None, None, None]
-            num_outputs = [2, 2, 2, 2]
+            num_outputs = [2, 128, 64, 32]
             for i in range(4):
                 if i == 0:
                     h[i] = feature_maps[i]
@@ -162,28 +162,11 @@ def loss(y_true_pixel, y_pred_pixel,
 
     classification_loss = dice_coefficient(y_true_pixel, y_pred_pixel, training_mask)
     # scale classification loss to match the iou loss part
-    classification_loss *= 0.02
+    classification_loss *= 2
 
     # d1 -> top, d2->right, d3->bottom, d4->left
     d1_gt, d2_gt, d3_gt, d4_gt, d5_gt, d6_gt, d7_gt, d8_gt= tf.split(value=y_true_link, num_or_size_splits=8, axis=3)
     d1_pred, d2_pred, d3_pred, d4_pred, d5_pred, d6_pred, d7_pred, d8_pred= tf.split(value=y_pred_link, num_or_size_splits=8, axis=3)
-    
-    #single example
-    # d1_gt_reshape = tf.cast(tf.reshape(d1_gt, [-1]), tf.int32)
-    # d1_pred_reshape = tf.reshape(d1_pred, [-1, 2])
-
-    # d1_pos_n = tf.reduce_sum(tf.cast(tf.equal(d1_gt_reshape, 1),tf.float32))
-    # d2_pos_n = tf.reduce_sum(tf.cast(tf.equal(d2_gt, 1),tf.float32))
-    # d3_pos_n = tf.reduce_sum(tf.cast(tf.equal(d3_gt, 1),tf.float32))
-    # d4_pos_n = tf.reduce_sum(tf.cast(tf.equal(d4_gt, 1),tf.float32))
-    # d5_pos_n = tf.reduce_sum(tf.cast(tf.equal(d5_gt, 1),tf.float32))
-    # d6_pos_n = tf.reduce_sum(tf.cast(tf.equal(d6_gt, 1),tf.float32))
-    # d7_pos_n = tf.reduce_sum(tf.cast(tf.equal(d7_gt, 1),tf.float32))
-    # d8_pos_n = tf.reduce_sum(tf.cast(tf.equal(d8_gt, 1),tf.float32))
-
-    # d1_softmax_loss = tf.reduce_sum((tf.nn.sparse_softmax_cross_entropy_with_logits(labels = d1_gt_reshape, logits = d1_pred_reshape)) * tf.cast(d1_gt_reshape, tf.float32))/d1_pos_n
-
-    # link_loss = d1_softmax_loss
 
     gt_reshape = tf.cast(tf.reshape(y_true_link, [-1]), tf.int32)
     pred_reshape = tf.reshape(y_pred_link, [-1, 2])
@@ -193,16 +176,7 @@ def loss(y_true_pixel, y_pred_pixel,
     softmax_loss = tf.reduce_sum((tf.nn.sparse_softmax_cross_entropy_with_logits(labels = gt_reshape, logits = pred_reshape)) * tf.cast(gt_reshape, tf.float32))/pos_n
 
     link_loss = softmax_loss
-    # d1_link_loss = - tf.reduce_mean(d1_gt * tf.log(d1_pred + 1e-10))/d1_pos_n
-    # d2_link_loss = - tf.reduce_mean(d1_gt * tf.log(d2_pred + 1e-10))/d2_pos_n
-    # d3_link_loss = - tf.reduce_mean(d1_gt * tf.log(d3_pred + 1e-10))/d3_pos_n
-    # d4_link_loss = - tf.reduce_mean(d1_gt * tf.log(d4_pred + 1e-10))/d4_pos_n
-    # d5_link_loss = - tf.reduce_mean(d1_gt * tf.log(d5_pred + 1e-10))/d5_pos_n
-    # d6_link_loss = - tf.reduce_mean(d1_gt * tf.log(d6_pred + 1e-10))/d6_pos_n
-    # d7_link_loss = - tf.reduce_mean(d1_gt * tf.log(d7_pred + 1e-10))/d7_pos_n
-    # d8_link_loss = - tf.reduce_mean(d1_gt * tf.log(d8_pred + 1e-10))/d8_pos_n
 
-    # link_loss = d1_link_loss + d2_link_loss + d3_link_loss + d4_link_loss + d5_link_loss + d6_link_loss + d7_link_loss + d8_link_loss
+    tf.summary.scalar('link_loss', link_loss)
 
-    # return link_loss
     return link_loss + classification_loss
