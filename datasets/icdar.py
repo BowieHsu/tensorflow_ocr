@@ -81,7 +81,9 @@ def polygon_area(poly):
     ]
     return np.sum(edge)/2.
 
-def valid_link(point, score_map, direction):
+def valid_link(point, score_map, w, h, direction):
+    if point[0] == h - 1 or point[1] == w - 1:
+        return 1
     if direction == 'up':
         point_dir = np.array([point[0], point[1] - 1])
     elif direction == 'down':
@@ -89,7 +91,7 @@ def valid_link(point, score_map, direction):
     elif direction == 'left':
         point_dir = np.array([point[0] - 1, point[1]])
     elif direction == 'right':
-        point_dir = np.array([point[0] + 1, point[1]] )
+        point_dir = np.array([max(point[0] + 1, h - 1), max(point[1], w - 1)])
     elif direction == 'left_up':
         point_dir = np.array([point[0] - 1, point[1] - 1])
     elif direction == 'left_down':
@@ -591,25 +593,26 @@ def generate_rbox(im_size, polys, tags):
         rectange, rotate_angle = sort_rectangle(rectange)
 
         p0_rect, p1_rect, p2_rect, p3_rect = rectange
+
         for y, x in xy_in_poly:
             point = np.array([x, y], dtype=np.int32)
             # left
 
-            geo_map[y, x, 0] = valid_link(point, score_map,'left')
+            geo_map[y, x, 0] = valid_link(point, score_map, w, h,'left')
             # left_down
-            geo_map[y, x, 1] = valid_link(point, score_map,'left_down')
+            geo_map[y, x, 1] = valid_link(point, score_map, w, h, 'left_down')
             # left_up
-            geo_map[y, x, 2] = valid_link(point, score_map,'left_up')
+            geo_map[y, x, 2] = valid_link(point, score_map, w, h, 'left_up')
             # right
-            geo_map[y, x, 3] = valid_link(point, score_map,'right')
+            geo_map[y, x, 3] = valid_link(point, score_map, w, h,'right')
             # right_down
-            geo_map[y, x, 4] = valid_link(point, score_map,'right_down')
+            geo_map[y, x, 4] = valid_link(point, score_map, w, h,'right_down')
             # right_up
-            geo_map[y, x, 5] = valid_link(point, score_map,'right_up')
+            geo_map[y, x, 5] = valid_link(point, score_map, w, h, 'right_up')
             # up
-            geo_map[y, x, 6] = valid_link(point, score_map,'up')
+            geo_map[y, x, 6] = valid_link(point, score_map, w, h, 'up')
             # down
-            geo_map[y, x, 7] = valid_link(point, score_map,'down')
+            geo_map[y, x, 7] = valid_link(point, score_map, w, h, 'down')
 
     return score_map, geo_map, training_mask
 

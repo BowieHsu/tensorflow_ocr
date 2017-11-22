@@ -171,9 +171,7 @@ def loss(y_true_pixel, y_pred_pixel,
     gt_reshape = tf.cast(tf.reshape(y_true_link, [-1]), tf.int32)
     pred_reshape = tf.reshape(y_pred_link, [-1, 2])
 
-    pos_n = tf.reduce_sum(tf.cast(tf.equal(gt_reshape, 1),tf.float32))
-
-    softmax_loss = tf.reduce_sum((tf.nn.sparse_softmax_cross_entropy_with_logits(labels = gt_reshape, logits = pred_reshape)) * tf.cast(gt_reshape, tf.float32))/pos_n
+    softmax_loss = tf.reduce_mean((tf.nn.sparse_softmax_cross_entropy_with_logits(labels = gt_reshape, logits = pred_reshape)))
 
     link_loss = softmax_loss
 

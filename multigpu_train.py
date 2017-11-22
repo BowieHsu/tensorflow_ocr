@@ -36,15 +36,17 @@ def tower_loss(images, score_maps, geo_maps, training_masks, reuse_variables=Non
 
     total_loss = tf.add_n([model_loss] + tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
 
+    # cls_score = tf.nn.softmax(f_score)
+    cls_score = f_score
     geo_score = tf.nn.softmax(f_geometry[:,:,:,0:2])
 
     # add summary
     if reuse_variables is None:
         tf.summary.image('input', images)
         tf.summary.image('score_map', score_maps)
-        tf.summary.image('score_map_pred', f_score * 255)
+        tf.summary.image('score_map_pred', cls_score * 255)
         tf.summary.image('geo_map_0', geo_maps[:, :, :, 0:1])
-        tf.summary.image('geo_map_0_pred', geo_score[:, :, :, 0:1] * 255)
+        # tf.summary.image('geo_map_0_pred', geo_score[:, :, :, 0:1] * 255)
         tf.summary.image('geo_map_1_pred', geo_score[:, :, :, 1:2] * 255)
         tf.summary.image('training_masks', training_masks)
         tf.summary.scalar('model_loss', model_loss)
