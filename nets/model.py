@@ -110,30 +110,37 @@ def model(images, weight_decay=1e-5, is_training=True):
             g = [None, None, None, None]
             h = [None, None, None, None]
             num_outputs = [2, 128, 64, 32]
-            for i in range(4):
-                if i == 0:
-                    h[i] = feature_maps[i]
-                else:
-                    c1_1 = slim.conv2d(tf.concat([g[i-1], feature_maps[i]], axis=-1), num_outputs[i], 1)
-                    h[i] = slim.conv2d(c1_1, num_outputs[i], 3)
-                if i <= 2:
-                    g[i] = unpool(h[i])
-                else:
-                    g[i] = slim.conv2d(h[i], num_outputs[i], 3)
-                print('Shape of h_{} {}, g_{} {}'.format(i, h[i].shape, i, g[i].shape))
+            PIXEL_OUTPUT = 2
+            LINK_OUTPUT = 16
+            # for i in range(4):
+                # if i == 0:
+                    # h[i] = feature_maps[i]
+                # else:
+                    # c1_1 = slim.conv2d(tf.concat([g[i-1], feature_maps[i]], axis=-1), num_outputs[i], 1)
+                    # h[i] = slim.conv2d(c1_1, num_outputs[i], 3)
+                # if i <= 2:
+                    # g[i] = unpool(h[i])
+                # else:
+                    # g[i] = slim.conv2d(h[i], num_outputs[i], 3)
+                # print('Shape of h_{} {}, g_{} {}'.format(i, h[i].shape, i, g[i].shape))
+            # for i in range(4):
+                # print('Shape of f_{} {}'.format(i, feature_maps[i].shape))
+            
+            pixel_1 = unpool(slim.conv2d(feature_maps[0], PIXEL_OUTPUT, 1)) + slim.conv2d(feature_maps[1], PIXEL_OUTPUT, 1)
+            pixel_2 = unpool(pixel_1) + slim.conv2d(feature_maps[2], PIXEL_OUTPUT, 1)
+            pixel_3 = unpool(pixel_2) + slim.conv2d(feature_maps[3], PIXEL_OUTPUT, 1)
 
-            # here we use a slightly different way for regression part,
-            # we first use a sigmoid to limit the regression range, and also
+            link_1 = unpool(slim.conv2d(feature_maps[0], LINK_OUTPUT, 1)) + slim.conv2d(feature_maps[1], LINK_OUTPUT, 1)
+            link_2 = unpool(link_1) + slim.conv2d(feature_maps[2], LINK_OUTPUT, 1)
+            link_3 = unpool(link_2) + slim.conv2d(feature_maps[3], LINK_OUTPUT, 1)
+            print('Shape of pixel {}, link {}'.format( pixel_3.shape, link_3.shape))
+
             # this is do with the angle map
-            F_score = slim.conv2d(g[3], 1, 1, activation_fn=tf.nn.sigmoid, normalizer_fn=None)
-            # 4 channel of axis aligned bbox and 1 channel rotation angle
-            # geo_map = slim.conv2d(g[3], 16, 1, activation_fn=tf.nn.sigmoid, normalizer_fn=None)
-            geo_map = slim.conv2d(g[3], 16, 1, activation_fn=None, normalizer_fn=None)
-            # angle_map = (slim.conv2d(g[3], 1, 1, activation_fn=tf.nn.sigmoid, normalizer_fn=None) - 0.5) * np.pi/2 # angle is between [-45, 45]
-            # F_geometry = tf.concat([geo_map, angle_map], axis=-1)
+            pixel_4 = slim.conv2d(pixel_3, PIXEL_OUTPUT, 1, activation_fn=None, normalizer_fn=None)
+            # pixel_4 = slim.conv2d(g[3], 2, 1, activation_fn=tf.nn.sigmoid, normalizer_fn=None)
+            link_4 = slim.conv2d(link_3, LINK_OUTPUT, 1, activation_fn=None, normalizer_fn=None)
 
-    return F_score, geo_map 
-
+    return pixel_4, link_4
 
 def dice_coefficient(y_true_cls, y_pred_cls,
                      training_mask):
@@ -151,7 +158,6 @@ def dice_coefficient(y_true_cls, y_pred_cls,
     tf.summary.scalar('classification_dice_loss', loss)
     return loss
 
-
 def loss(y_true_pixel, y_pred_pixel,
          y_true_link, y_pred_link,
          training_mask):
@@ -159,22 +165,22 @@ def loss(y_true_pixel, y_pred_pixel,
     return pixel loss and link loss 
     add OHEM mode
     '''
+    
+    pixel_label = tf.cast(tf.reshape(y_true_pixel,[-1]), tf.int32)
+    pixel_pred = tf.reshape(y_pred_pixel, [-1, 2])
 
-    classification_loss = dice_coefficient(y_true_pixel, y_pred_pixel, training_mask)
-    # scale classification loss to match the iou loss part
+    classification_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = pixel_label, logits = pixel_pred))
+    # classification_loss = dice_coefficient(y_true_pixel, y_pred_pixel, training_mask)
     classification_loss *= 2
 
-    # d1 -> top, d2->right, d3->bottom, d4->left
-    d1_gt, d2_gt, d3_gt, d4_gt, d5_gt, d6_gt, d7_gt, d8_gt= tf.split(value=y_true_link, num_or_size_splits=8, axis=3)
-    d1_pred, d2_pred, d3_pred, d4_pred, d5_pred, d6_pred, d7_pred, d8_pred= tf.split(value=y_pred_link, num_or_size_splits=8, axis=3)
+    link_label = tf.cast(tf.reshape(y_true_link, [-1]), tf.int32)
+    link_pred = tf.reshape(y_pred_link, [-1, 2])
 
-    gt_reshape = tf.cast(tf.reshape(y_true_link, [-1]), tf.int32)
-    pred_reshape = tf.reshape(y_pred_link, [-1, 2])
-
-    softmax_loss = tf.reduce_mean((tf.nn.sparse_softmax_cross_entropy_with_logits(labels = gt_reshape, logits = pred_reshape)))
+    softmax_loss = tf.reduce_mean((tf.nn.sparse_softmax_cross_entropy_with_logits(labels = link_label, logits = link_pred)))
 
     link_loss = softmax_loss
 
+    tf.summary.scalar('classification_loss', classification_loss)
     tf.summary.scalar('link_loss', link_loss)
 
     return link_loss + classification_loss

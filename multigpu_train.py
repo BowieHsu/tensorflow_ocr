@@ -28,7 +28,6 @@ def tower_loss(images, score_maps, geo_maps, training_masks, reuse_variables=Non
     # Build inference graph
     with tf.variable_scope(tf.get_variable_scope(), reuse=reuse_variables):
         f_score, f_geometry = model.model(images, is_training=True)
-        # f_score, f_geometry = model.model_resnet_v1_101(images, is_training=True)
 
     model_loss = model.loss(score_maps, f_score,
                             geo_maps, f_geometry,
@@ -36,19 +35,32 @@ def tower_loss(images, score_maps, geo_maps, training_masks, reuse_variables=Non
 
     total_loss = tf.add_n([model_loss] + tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
 
-    # cls_score = tf.nn.softmax(f_score)
-    cls_score = f_score
-    geo_score = tf.nn.softmax(f_geometry[:,:,:,0:2])
+    # cls_score = f_score
+    cls_score = tf.nn.softmax(f_score)
+    geo_score_1 = tf.nn.softmax(f_geometry[:,:,:,0:2])
+    # geo_score_2 = tf.nn.softmax(f_geometry[:,:,:,2:4])
+    # geo_score_3 = tf.nn.softmax(f_geometry[:,:,:,4:6])
+    # geo_score_4 = tf.nn.softmax(f_geometry[:,:,:,6:8])
+    # geo_score_5 = tf.nn.softmax(f_geometry[:,:,:,8:10])
+    # geo_score_6 = tf.nn.softmax(f_geometry[:,:,:,10:12])
+    # geo_score_7 = tf.nn.softmax(f_geometry[:,:,:,12:14])
+    # geo_score_8 = tf.nn.softmax(f_geometry[:,:,:,14:16])
 
     # add summary
     if reuse_variables is None:
-        tf.summary.image('input', images)
-        tf.summary.image('score_map', score_maps)
-        tf.summary.image('score_map_pred', cls_score * 255)
-        tf.summary.image('geo_map_0', geo_maps[:, :, :, 0:1])
-        # tf.summary.image('geo_map_0_pred', geo_score[:, :, :, 0:1] * 255)
-        tf.summary.image('geo_map_1_pred', geo_score[:, :, :, 1:2] * 255)
-        tf.summary.image('training_masks', training_masks)
+        tf.summary.image('input', images, max_outputs=1)
+        tf.summary.image('score_map', score_maps, max_outputs=1)
+        # tf.summary.image('score_map_pred', cls_score * 255, max_outputs=1)
+        tf.summary.image('score_map_pred', cls_score[:,:,:,1:2] * 255, max_outputs=1)
+        tf.summary.image('geo_map_0', geo_maps[:, :, :, 0:1], max_outputs=1)
+        tf.summary.image('geo_map_1_pred', geo_score_1[:, :, :, 1:2] * 255, max_outputs=1)
+        # tf.summary.image('geo_map_2_pred', geo_score_2[:, :, :, 1:2] * 255, max_outputs=1)
+        # tf.summary.image('geo_map_3_pred', geo_score_3[:, :, :, 1:2] * 255, max_outputs=1)
+        # tf.summary.image('geo_map_4_pred', geo_score_4[:, :, :, 1:2] * 255, max_outputs=1)
+        # tf.summary.image('geo_map_5_pred', geo_score_5[:, :, :, 1:2] * 255, max_outputs=1)
+        # tf.summary.image('geo_map_6_pred', geo_score_6[:, :, :, 1:2] * 255, max_outputs=1)
+        # tf.summary.image('geo_map_7_pred', geo_score_7[:, :, :, 1:2] * 255, max_outputs=1)
+        # tf.summary.image('geo_map_8_pred', geo_score_8[:, :, :, 1:2] * 255, max_outputs=1)
         tf.summary.scalar('model_loss', model_loss)
         tf.summary.scalar('total_loss', total_loss)
 
@@ -85,10 +97,7 @@ def main(argv=None):
 
     input_images = tf.placeholder(tf.float32, shape=[None, None, None, 3], name='input_images')
     input_score_maps = tf.placeholder(tf.float32, shape=[None, None, None, 1], name='input_score_maps')
-    if FLAGS.geometry == 'RBOX':
-        input_geo_maps = tf.placeholder(tf.float32, shape=[None, None, None, 8], name='input_geo_maps')
-    else:
-        input_geo_maps = tf.placeholder(tf.float32, shape=[None, None, None, 8], name='input_geo_maps')
+    input_geo_maps = tf.placeholder(tf.float32, shape=[None, None, None, 8], name='input_geo_maps')
     input_training_masks = tf.placeholder(tf.float32, shape=[None, None, None, 1], name='input_training_masks')
 
     global_step = tf.get_variable('global_step', [], initializer=tf.constant_initializer(0), trainable=False)

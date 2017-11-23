@@ -40,7 +40,6 @@ def get_images():
             os.path.join(FLAGS.training_data_path, '*.{}'.format(ext))))
     return files
 
-
 def load_annoataion(p):
     '''
     load annotation from the text file
@@ -85,19 +84,19 @@ def valid_link(point, score_map, w, h, direction):
     if point[0] == h - 1 or point[1] == w - 1:
         return 1
     if direction == 'up':
-        point_dir = np.array([point[0], point[1] - 1])
-    elif direction == 'down':
-        point_dir = np.array([point[0], point[1] + 1])
-    elif direction == 'left':
         point_dir = np.array([point[0] - 1, point[1]])
+    elif direction == 'down':
+        point_dir = np.array([point[0] + 1, point[1]])
+    elif direction == 'left':
+        point_dir = np.array([point[0], point[1] - 1])
     elif direction == 'right':
-        point_dir = np.array([max(point[0] + 1, h - 1), max(point[1], w - 1)])
+        point_dir = np.array([point[0], point[1] + 1])
     elif direction == 'left_up':
         point_dir = np.array([point[0] - 1, point[1] - 1])
     elif direction == 'left_down':
-        point_dir = np.array([point[0] - 1, point[1] + 1])
-    elif direction == 'right_up':
         point_dir = np.array([point[0] + 1, point[1] - 1])
+    elif direction == 'right_up':
+        point_dir = np.array([point[0] - 1, point[1] + 1])
     elif direction == 'right_down':
         point_dir = np.array([point[0] + 1, point[1] + 1])
     if score_map[point[1], point[0]] == 1 and score_map[point_dir[1], point_dir[0]] == 1:
@@ -516,88 +515,11 @@ def generate_rbox(im_size, polys, tags):
             cv2.fillPoly(training_mask, poly.astype(np.int32)[np.newaxis, :, :], 0)
 
         xy_in_poly = np.argwhere(poly_mask == (poly_idx + 1))
-        # if geometry == 'RBOX':
-        # 对任意两个顶点的组合生成一个平行四边形
-        fitted_parallelograms = []
-        for i in range(4):
-            p0 = poly[i]
-            p1 = poly[(i + 1) % 4]
-            p2 = poly[(i + 2) % 4]
-            p3 = poly[(i + 3) % 4]
-            edge = fit_line([p0[0], p1[0]], [p0[1], p1[1]])
-            backward_edge = fit_line([p0[0], p3[0]], [p0[1], p3[1]])
-            forward_edge = fit_line([p1[0], p2[0]], [p1[1], p2[1]])
-            if point_dist_to_line(p0, p1, p2) > point_dist_to_line(p0, p1, p3):
-                # 平行线经过p2
-                if edge[1] == 0:
-                    edge_opposite = [1, 0, -p2[0]]
-                else:
-                    edge_opposite = [edge[0], -1, p2[1] - edge[0] * p2[0]]
-            else:
-                # 经过p3
-                if edge[1] == 0:
-                    edge_opposite = [1, 0, -p3[0]]
-                else:
-                    edge_opposite = [edge[0], -1, p3[1] - edge[0] * p3[0]]
-            # move forward edge
-            new_p0 = p0
-            new_p1 = p1
-            new_p2 = p2
-            new_p3 = p3
-            new_p2 = line_cross_point(forward_edge, edge_opposite)
-            if point_dist_to_line(p1, new_p2, p0) > point_dist_to_line(p1, new_p2, p3):
-                # across p0
-                if forward_edge[1] == 0:
-                    forward_opposite = [1, 0, -p0[0]]
-                else:
-                    forward_opposite = [forward_edge[0], -1, p0[1] - forward_edge[0] * p0[0]]
-            else:
-                # across p3
-                if forward_edge[1] == 0:
-                    forward_opposite = [1, 0, -p3[0]]
-                else:
-                    forward_opposite = [forward_edge[0], -1, p3[1] - forward_edge[0] * p3[0]]
-            new_p0 = line_cross_point(forward_opposite, edge)
-            new_p3 = line_cross_point(forward_opposite, edge_opposite)
-            fitted_parallelograms.append([new_p0, new_p1, new_p2, new_p3, new_p0])
-            # or move backward edge
-            new_p0 = p0
-            new_p1 = p1
-            new_p2 = p2
-            new_p3 = p3
-            new_p3 = line_cross_point(backward_edge, edge_opposite)
-            if point_dist_to_line(p0, p3, p1) > point_dist_to_line(p0, p3, p2):
-                # across p1
-                if backward_edge[1] == 0:
-                    backward_opposite = [1, 0, -p1[0]]
-                else:
-                    backward_opposite = [backward_edge[0], -1, p1[1] - backward_edge[0] * p1[0]]
-            else:
-                # across p2
-                if backward_edge[1] == 0:
-                    backward_opposite = [1, 0, -p2[0]]
-                else:
-                    backward_opposite = [backward_edge[0], -1, p2[1] - backward_edge[0] * p2[0]]
-            new_p1 = line_cross_point(backward_opposite, edge)
-            new_p2 = line_cross_point(backward_opposite, edge_opposite)
-            fitted_parallelograms.append([new_p0, new_p1, new_p2, new_p3, new_p0])
-        areas = [Polygon(t).area for t in fitted_parallelograms]
-        parallelogram = np.array(fitted_parallelograms[np.argmin(areas)][:-1], dtype=np.float32)
-        # sort thie polygon
-        parallelogram_coord_sum = np.sum(parallelogram, axis=1)
-        min_coord_idx = np.argmin(parallelogram_coord_sum)
-        parallelogram = parallelogram[
-            [min_coord_idx, (min_coord_idx + 1) % 4, (min_coord_idx + 2) % 4, (min_coord_idx + 3) % 4]]
-
-        rectange = rectangle_from_parallelogram(parallelogram)
-        rectange, rotate_angle = sort_rectangle(rectange)
-
-        p0_rect, p1_rect, p2_rect, p3_rect = rectange
 
         for y, x in xy_in_poly:
             point = np.array([x, y], dtype=np.int32)
-            # left
 
+            # left
             geo_map[y, x, 0] = valid_link(point, score_map, w, h,'left')
             # left_down
             geo_map[y, x, 1] = valid_link(point, score_map, w, h, 'left_down')
@@ -688,14 +610,17 @@ def generator(input_size=512, batch_size=32,
                     resize_h = input_size
                     resize_w = input_size
                     im = cv2.resize(im, dsize=(resize_w, resize_h))
-                    resize_ratio_3_x = resize_w/float(new_w)
+                    resize_ratio_3_x = resize_w/float(new_w) 
                     resize_ratio_3_y = resize_h/float(new_h)
                     text_polys[:, :, 0] *= resize_ratio_3_x
-                    text_polys[:, :, 1] *= resize_ratio_3_y
+                    text_polys[:, :, 1] *= resize_ratio_3_y 
                     new_h, new_w, _ = im.shape
+                    # new_h = 128
+                    # new_w = 128
                     score_map, geo_map, training_mask = generate_rbox((new_h, new_w), text_polys, text_tags)
                     # cv2.imwrite('./geo_map.jpg', geo_map[:,:,0]*255)
-                    # cv2.imwrite('./score_map.jpg', score_map*255)
+                    cv2.imwrite('./im.jpg', im)
+                    cv2.imwrite('./score_map.jpg', score_map*255)
 
                 if vis:
                     fig, axs = plt.subplots(3, 2, figsize=(20, 30))
@@ -745,6 +670,9 @@ def generator(input_size=512, batch_size=32,
                 score_maps.append(score_map[::4, ::4, np.newaxis].astype(np.float32))
                 geo_maps.append(geo_map[::4, ::4, :].astype(np.float32))
                 training_masks.append(training_mask[::4, ::4, np.newaxis].astype(np.float32))
+                # score_maps.append(score_map[::, ::, np.newaxis].astype(np.float32))
+                # geo_maps.append(geo_map[::, ::, :].astype(np.float32))
+                # training_masks.append(training_mask[::, ::, np.newaxis].astype(np.float32))
 
                 if len(images) == batch_size:
                     yield images, image_fns, score_maps, geo_maps, training_masks
