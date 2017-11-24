@@ -59,7 +59,6 @@ def pixel_detect(score_map, geo_map, score_map_thresh=0.8, link_thresh=0.8):
 
     # filter the score map
     res_map = np.zeros((score_map.shape[0] ,score_map.shape[1] ))
-    ori_res_map = np.zeros((score_map.shape[0] * 4, score_map.shape[1] * 4))
     xy_text = np.argwhere(score_map > score_map_thresh)
 
     for p in xy_text:
@@ -68,22 +67,11 @@ def pixel_detect(score_map, geo_map, score_map_thresh=0.8, link_thresh=0.8):
     res = res_map
 
     for i in range(8):
-        geo_map_split = geo_map[:,:,i * 2 - 1]
-        link_text = np.argwhere(geo_map_split > link_thresh)
-        # pdb.set_trace()
-        # for p in link_text:
-            # res[p[0],p[1]] = 1
-
-    xy_text = np.argwhere(res == 1)
-
-    draw_range = 7
-
-    for p in xy_text:
-        ori_res_map[p[0] * 4 - draw_range: p[0] * 4 + draw_range, p[1] * 4 - draw_range : p[1] * 4 + draw_range] = 1
-
-    ori_res_map = np.array(ori_res_map, dtype=np.uint8)
+        geo_map_split = geo_map[:,:,i * 2 + 1]
+        link_text = np.argwhere(geo_map_split < link_thresh)
+        res[link_text[0], link_text[1]] = 0
    
-    return ori_res_map
+    return np.array(res_map, dtype=np.uint8) 
 
 def get_images():
     '''
@@ -150,6 +138,14 @@ def main(argv=None):
         global_step = tf.get_variable('global_step', [], initializer=tf.constant_initializer(0), trainable=False)
 
         f_score, f_geometry = model.model(input_images, is_training=False)
+
+        cls_score = tf.nn.softmax(f_score)[:,:,:,1:2]
+
+        pixel_score = tf.reshape(f_geometry, [-1,2])
+        pixel_score = tf.nn.softmax(pixel_score)
+        pixel_shape = tf.shape(f_geometry)
+        pixel_score = tf.reshape(pixel_score,[pixel_shape[0], pixel_shape[1], pixel_shape[2], pixel_shape[3]])
+
         variable_averages = tf.train.ExponentialMovingAverage(0.997, global_step)
         saver = tf.train.Saver(variable_averages.variables_to_restore())
 
@@ -167,12 +163,17 @@ def main(argv=None):
                 start_time = time.time()
                 im_resized, (ratio_h, ratio_w) = resize_image(im)
                 print ratio_h,ratio_w
-                score, geometry = sess.run([f_score, f_geometry], feed_dict={input_images: [im_resized]})
+                # score, geometry = sess.run([f_score, f_geometry], feed_dict={input_images: [im_resized]})
+                score, geometry = sess.run([cls_score, pixel_score], feed_dict={input_images: [im_resized]})
                 timer['net'] = time.time() - start_time
 
                 print 'net time:' + str(timer['net'] * 1000) + 'ms'
 
+                cv2.imwrite('./score_map.jpg', np.array(score[0,:,:,0]*255, dtype=np.uint8))
+
                 score_map_res = pixel_detect(score_map=score, geo_map=geometry)
+
+                cv2.imwrite('./img.jpg', score_map_res*255)
 
                 # pdb.set_trace()
                 
@@ -188,6 +189,10 @@ def main(argv=None):
                     np_contours = np.array(np.reshape(contours[i],[-1,2]), dtype=np.float32)
                     rectangle = cv2.minAreaRect(np_contours)
                     box = np.int0(cv2.boxPoints(rectangle))
+
+                    box[:, 0] = box[:,0] * 4
+                    box[:, 1] = box[:,1] * 4
+
                     cv2.drawContours(im_ori_resize, [box], -1,(0,255,0), 3)
                     
                     # pdb.set_trace()
