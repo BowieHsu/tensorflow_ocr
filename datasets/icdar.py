@@ -572,12 +572,15 @@ def generator(input_size=512, batch_size=32,
                 # if text_polys.shape[0] == 0:
                 #     continue
                 # random scale this image
-                rd_scale = np.random.choice(random_scale)
-                im = cv2.resize(im, dsize=None, fx=rd_scale, fy=rd_scale)
-                text_polys *= rd_scale
+
+                # rd_scale = np.random.choice(random_scale)
+                # im = cv2.resize(im, dsize=None, fx=rd_scale, fy=rd_scale)
+                # text_polys *= rd_scale
+
                 # print rd_scale
                 # random crop a area from image
-                if np.random.rand() < background_ratio:
+                if (0):
+                # if np.random.rand() < background_ratio:
                     # crop background
                     im, text_polys, text_tags = crop_area(im, text_polys, text_tags, crop_background=True)
                     if text_polys.shape[0] > 0:
@@ -594,17 +597,17 @@ def generator(input_size=512, batch_size=32,
                     geo_map = np.zeros((input_size, input_size, geo_map_channels), dtype=np.float32)
                     training_mask = np.ones((input_size, input_size), dtype=np.uint8)
                 else:
-                    im, text_polys, text_tags = crop_area(im, text_polys, text_tags, crop_background=False)
+                    # im, text_polys, text_tags = crop_area(im, text_polys, text_tags, crop_background=False)
                     if text_polys.shape[0] == 0:
                         continue
                     h, w, _ = im.shape
 
                     # pad the image to the training input size or the longer side of image
-                    new_h, new_w, _ = im.shape
-                    max_h_w_i = np.max([new_h, new_w, input_size])
-                    im_padded = np.zeros((max_h_w_i, max_h_w_i, 3), dtype=np.uint8)
-                    im_padded[:new_h, :new_w, :] = im.copy()
-                    im = im_padded
+                    # new_h, new_w, _ = im.shape
+                    # max_h_w_i = np.max([new_h, new_w, input_size])
+                    # im_padded = np.zeros((max_h_w_i, max_h_w_i, 3), dtype=np.uint8)
+                    # im_padded[:new_h, :new_w, :] = im.copy()
+                    # im = im_padded
                     # resize the image to input size
                     new_h, new_w, _ = im.shape
                     resize_h = input_size
@@ -619,51 +622,10 @@ def generator(input_size=512, batch_size=32,
                     # new_w = 128
                     score_map, geo_map, training_mask = generate_rbox((new_h, new_w), text_polys, text_tags)
                     # cv2.imwrite('./geo_map.jpg', geo_map[:,:,0]*255)
-                    cv2.imwrite('./im.jpg', im)
-                    cv2.imwrite('./score_map.jpg', score_map*255)
+                    # cv2.imwrite('./im.jpg', im)
+                    # cv2.imwrite('./train_score_map.jpg', score_map*255)
+                    # cv2.imwrite('./train_mask.jpg', training_mask*255)
 
-                if vis:
-                    fig, axs = plt.subplots(3, 2, figsize=(20, 30))
-                    # axs[0].imshow(im[:, :, ::-1])
-                    # axs[0].set_xticks([])
-                    # axs[0].set_yticks([])
-                    # for poly in text_polys:
-                    #     poly_h = min(abs(poly[3, 1] - poly[0, 1]), abs(poly[2, 1] - poly[1, 1]))
-                    #     poly_w = min(abs(poly[1, 0] - poly[0, 0]), abs(poly[2, 0] - poly[3, 0]))
-                    #     axs[0].add_artist(Patches.Polygon(
-                    #         poly * 4, facecolor='none', edgecolor='green', linewidth=2, linestyle='-', fill=True))
-                    #     axs[0].text(poly[0, 0] * 4, poly[0, 1] * 4, '{:.0f}-{:.0f}'.format(poly_h * 4, poly_w * 4),
-                    #                    color='purple')
-                    # axs[1].imshow(score_map)
-                    # axs[1].set_xticks([])
-                    # axs[1].set_yticks([])
-                    axs[0, 0].imshow(im[:, :, ::-1])
-                    axs[0, 0].set_xticks([])
-                    axs[0, 0].set_yticks([])
-                    for poly in text_polys:
-                        poly_h = min(abs(poly[3, 1] - poly[0, 1]), abs(poly[2, 1] - poly[1, 1]))
-                        poly_w = min(abs(poly[1, 0] - poly[0, 0]), abs(poly[2, 0] - poly[3, 0]))
-                        axs[0, 0].add_artist(Patches.Polygon(
-                            poly, facecolor='none', edgecolor='green', linewidth=2, linestyle='-', fill=True))
-                        axs[0, 0].text(poly[0, 0], poly[0, 1], '{:.0f}-{:.0f}'.format(poly_h, poly_w), color='purple')
-                    axs[0, 1].imshow(score_map[::, ::])
-                    axs[0, 1].set_xticks([])
-                    axs[0, 1].set_yticks([])
-                    axs[1, 0].imshow(geo_map[::, ::, 0])
-                    axs[1, 0].set_xticks([])
-                    axs[1, 0].set_yticks([])
-                    axs[1, 1].imshow(geo_map[::, ::, 1])
-                    axs[1, 1].set_xticks([])
-                    axs[1, 1].set_yticks([])
-                    axs[2, 0].imshow(geo_map[::, ::, 2])
-                    axs[2, 0].set_xticks([])
-                    axs[2, 0].set_yticks([])
-                    axs[2, 1].imshow(training_mask[::, ::])
-                    axs[2, 1].set_xticks([])
-                    axs[2, 1].set_yticks([])
-                    plt.tight_layout()
-                    plt.show()
-                    plt.close()
 
                 images.append(im[:, :, ::-1].astype(np.float32))
                 image_fns.append(im_fn)
