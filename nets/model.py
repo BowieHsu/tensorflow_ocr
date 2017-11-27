@@ -158,6 +158,49 @@ def dice_coefficient(y_true_cls, y_pred_cls,
     tf.summary.scalar('classification_dice_loss', loss)
     return loss
 
+def OHNM_single_image(scores, n_pos, neg_mask):
+    """Online Hard Negative Mining.
+    scores: the scores of being predicted as negative cls
+    n_pos: the number of positive samples 
+    neg_mask: mask of negative samples
+    Return:
+    the mask of selected negative samples.
+    if n_pos == 0, no negative samples will be selected.
+    """
+    def has_pos():
+        n_neg = n_pos * 3
+        max_neg_entries = tf.reduce_sum(tf.cast(neg_mask, tf.int32))
+        n_neg = tf.minimum(n_neg, max_neg_entries)
+        n_neg = tf.cast(n_neg, tf.int32)
+        neg_conf = tf.boolean_mask(scores, neg_mask)
+        vals, _ = tf.nn.top_k(-neg_conf, k=n_neg)
+        threshold = vals[-1]# a negtive value
+        selected_neg_mask = tf.logical_and(neg_mask, scores <= -threshold)
+        return tf.cast(selected_neg_mask, tf.float32)
+                
+    def no_pos():
+        return tf.zeros_like(neg_mask, tf.float32)
+            
+    return tf.cond(n_pos > 0, has_pos, no_pos) 
+
+def OHNM_batch(batch_size, neg_conf, pos_mask, neg_mask):
+      selected_neg_mask = []
+      for image_idx in range(batch_size):
+          image_neg_conf = neg_conf[image_idx, :]
+          image_neg_mask = neg_mask[image_idx, :]
+          image_pos_mask = pos_mask[image_idx, :]
+          n_pos = tf.reduce_sum(tf.cast(image_pos_mask, tf.int32))
+          selected_neg_mask.append(OHNM_single_image(image_neg_conf, n_pos, image_neg_mask))
+               
+      selected_neg_mask = tf.stack(selected_neg_mask)
+      selected_mask = tf.cast(pos_mask, tf.float32) + selected_neg_mask
+      return selected_mask
+
+def get_pos_and_neg_masks(labels):
+       pos_mask = tf.equal(labels, 1)
+       neg_mask = tf.equal(labels, 0)
+       return pos_mask, neg_mask
+
 def loss(y_true_pixel, y_pred_pixel,
          y_true_link, y_pred_link,
          training_mask):
@@ -166,12 +209,30 @@ def loss(y_true_pixel, y_pred_pixel,
     add OHEM mode
     '''
     
-    pixel_label = tf.cast(tf.reshape(y_true_pixel,[-1]), tf.int32)
-    pixel_pred = tf.reshape(y_pred_pixel, [-1, 2])
+    pixel_shape = tf.shape(y_pred_pixel)
+    pixel_label = tf.cast(tf.reshape(y_true_pixel,[pixel_shape[0],-1]), dtype = tf.int32)
+    pixel_pred = tf.reshape(y_pred_pixel, [pixel_shape[0],-1, 2])
 
-    classification_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = pixel_label, logits = pixel_pred))
-    # classification_loss = dice_coefficient(y_true_pixel, y_pred_pixel, training_mask)
-    classification_loss *= 2
+    pixel_scores = slim.softmax(pixel_pred)
+    pixel_neg_scores = pixel_scores[:,:,0]
+    pixel_pos_mask,pixel_neg_mask = get_pos_and_neg_masks(pixel_label)
+    # batch_size = y_pred_pixel.get_shape().as_list()[0]
+    pixel_selected_mask = OHNM_batch(14, pixel_neg_scores, pixel_pos_mask, pixel_neg_mask)
+
+    n_seg_pos = tf.reduce_sum(tf.cast(pixel_pos_mask, tf.float32))
+    # classification_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels = pixel_label, logits = pixel_pred))
+    # classification_loss *= 2
+
+
+    #cls_mining_loss_function
+    with tf.name_scope('ohem_pixel_loss'):
+        def has_pos():
+            pixel_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits = pixel_pred, labels = pixel_label)
+            return tf.reduce_sum(pixel_loss * pixel_selected_mask)/n_seg_pos
+        def no_pos():
+            return tf.constant(.0)
+
+        classification_loss = tf.cond(n_seg_pos > 0, has_pos, no_pos)
 
     link_label = tf.cast(tf.reshape(y_true_link, [-1]), tf.int32)
     link_pred = tf.reshape(y_pred_link, [-1, 2])
@@ -183,4 +244,4 @@ def loss(y_true_pixel, y_pred_pixel,
     tf.summary.scalar('classification_loss', classification_loss)
     tf.summary.scalar('link_loss', link_loss)
 
-    return link_loss + classification_loss
+    return link_loss + 2 * classification_loss
