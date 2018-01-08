@@ -50,82 +50,72 @@ def points_to_contour(points):
     contours = [[list(p)] for p in points]
     return np.asarray(contours, dtype = np.int32)
 
-def generate_rbox(h, w,  xs, ys, ignored):
+def generate_rbox(h, w, xs, ys, bboxes, ignored):
     assert len(xs) == len(ignored), 'the length of xs and ignored must be the same,\
         but got %s and %s'%(len(xs), len(ignored))
-    h = h/4
-    w = w/4
+    new_h = h/4
+    new_w = w/4
     xs = xs
     ys = ys
+    
+    # ori_score_map = np.zeros((h, w),dtype = np.float32)
     score_map = np.zeros((h, w), dtype=np.float32)
     link_map = np.zeros((h, w, 8), dtype=np.float32)
-    poly_mask = np.zeros((h,w), dtype=np.uint8)
+    res_link_map = np.zeros((new_h, new_w, 8), dtype=np.float32)
+    poly_mask = np.zeros((h, w), dtype=np.uint8)
+    show_bboxes = np.zeros((200,4), dtype =np.float32)
 
     xs = np.asarray(xs, dtype = np.float32)
     ys = np.asarray(ys, dtype = np.float32)
 
-
     num_rects = xs.shape[0]
     rect_area = []
-    poly = []
-
-    # for idx in range(num_rects):
-    # if valid_bbox_idxes == []:
-        # return score_map, link_map
 
     for idx in range(num_rects):
-        # if idx in valid_bbox_idxes:
-            points = zip(xs[idx, :] * w, ys[idx, :] * h)
-            cnt = points_to_contour(points)
-            rect = cv2.minAreaRect(cnt)
-            poly.append(np.int0(cv2.boxPoints(rect)))
-            area = rect[1][0] * rect[1][1]
-            rect_area.append(area)
-            if rect[1][0] < 10 or rect[1][1] < 10:
-                ignored[idx] = 0
-
-    # B = np.sum(rect_area)/num_rects * 1.0
-    # rect_area = np.true_divide(B, rect_area)
+        # points = zip(xs[idx, :] * new_w + [1, -1, -1, 1], ys[idx, :] * new_h + [1, 1, -1, -1])
+        points = zip(xs[idx, :] * w, ys[idx, :] * h )
+        show_bboxes[idx, :] = bboxes[idx, :]
+        draw_poly = np.array([points], np.int32)
+        cv2.fillPoly(score_map, draw_poly, 1.0)
+        cv2.fillPoly(poly_mask, draw_poly, idx + 1)
 
     valid_bbox_idxes = np.where(ignored == 0)[0]
 
+    res_score_map = cv2.resize(score_map, (new_w, new_h), interpolation = cv2.INTER_NEAREST)
+    poly_mask = cv2.resize(poly_mask, (new_w, new_h), interpolation = cv2.INTER_NEAREST)
+
     for poly_idx in range(num_rects):
-        draw_poly = poly[poly_idx].astype(np.int32)[np.newaxis, :,:]
-        # cv2.fillPoly(score_map, draw_poly, rect_area[poly_idx])
-        if(poly_idx not in valid_bbox_idxes) and (valid_bbox_idxes != []):
-            cv2.fillPoly(score_map, draw_poly, -1.0)
-        else:
-            cv2.fillPoly(score_map, draw_poly, 1.0)
-            cv2.fillPoly(poly_mask, draw_poly, poly_idx + 1)
             xy_in_poly = np.argwhere(poly_mask == (poly_idx + 1))
 
             for y, x in xy_in_poly:
+                #print 'y,x',y,x
                 # point = np.array([x, y], dtype=np.int32)
                 # left
-                link_map[y, x, 0] = valid_link(x, y, poly_mask, poly_idx + 1, w, h,'left')
+                res_link_map[y, x, 0] = valid_link(x, y, poly_mask, poly_idx + 1, new_w, new_h,'left')
                 # left_down
-                link_map[y, x, 1] = valid_link(x, y, poly_mask, poly_idx + 1, w, h, 'left_down')
+                res_link_map[y, x, 1] = valid_link(x, y, poly_mask, poly_idx + 1, new_w, new_h, 'left_down')
                 # left_up
-                link_map[y, x, 2] = valid_link(x, y, poly_mask, poly_idx + 1, w, h, 'left_up')
+                res_link_map[y, x, 2] = valid_link(x, y, poly_mask, poly_idx + 1, new_w, new_h, 'left_up')
                 # right
-                link_map[y, x, 3] = valid_link(x, y, poly_mask, poly_idx + 1, w, h,'right')
+                res_link_map[y, x, 3] = valid_link(x, y, poly_mask, poly_idx + 1, new_w, new_h,'right')
                 # right_down
-                link_map[y, x, 4] = valid_link(x, y, poly_mask, poly_idx + 1, w, h,'right_down')
+                res_link_map[y, x, 4] = valid_link(x, y, poly_mask, poly_idx + 1, new_w, new_h,'right_down')
                 # right_up
-                link_map[y, x, 5] = valid_link(x, y, poly_mask, poly_idx + 1, w, h, 'right_up')
+                res_link_map[y, x, 5] = valid_link(x, y, poly_mask, poly_idx + 1, new_w, new_h, 'right_up')
                 # up
-                link_map[y, x, 6] = valid_link(x, y, poly_mask, poly_idx + 1, w, h, 'up')
+                res_link_map[y, x, 6] = valid_link(x, y, poly_mask, poly_idx + 1, new_w, new_h, 'up')
                 # down
-                link_map[y, x, 7] = valid_link(x, y, poly_mask, poly_idx + 1, w, h, 'down')
+                res_link_map[y, x, 7] = valid_link(x, y, poly_mask, poly_idx + 1, new_w, new_h, 'down')
 
-    return score_map, link_map
+    return res_score_map, res_link_map, show_bboxes
 
-def tf_pixellink_get_rbox(img_size, xs, ys, ignored):
+def tf_pixellink_get_rbox(img_size, xs, ys, bboxes, ignored):
     h, w = img_size
-    pixel_map, link_map = tf.py_func(generate_rbox, [h, w, xs, ys, ignored], [tf.float32, tf.float32])
+    pixel_map, link_map, show_bboxes = tf.py_func(generate_rbox, [h, w, xs, ys, bboxes, ignored], [tf.float32, tf.float32, tf.float32])
     pixel_map.set_shape([h/4, w/4])
     link_map.set_shape([h/4 ,w/4, 8])
-    return pixel_map, link_map
+    show_bboxes.set_shape([200, 4]) 
+    return pixel_map, link_map, show_bboxes
 
 def pixel_detect(score_map, geo_map, score_map_thresh=0.8, link_thresh=0.8):
     '''
